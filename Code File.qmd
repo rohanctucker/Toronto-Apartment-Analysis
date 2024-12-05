@@ -1,0 +1,214 @@
+---
+title: "Stats 101 Spring 2024 Midterm"
+subtitle: "Property report"
+author: "Anonymous"
+date: "4/2/2024"
+output:
+  html_document:
+    toc: true
+format: 
+  html:
+    embed-resources: true
+---
+
+```{r, setup, include=FALSE, message=FALSE, warning=FALSE}
+#| label: setup
+#| include: false
+library(dplyr)
+library(ggplot2)
+```
+
+# Assignment instructions
+
+![](toronto.jpg){width="800"}
+
+
+## Introduction:
+
+The absence of criteria for determining the cost of rental houses has been a significant obstacle in the process of determining acceptable rental housing prices [1]. According to the data on property assessment, a significant number of homeowners have either been undercharging or overcharging their customers. There have been instances in which the prices of residences of comparable nature and quality have been different from one another. However, investors and homeowners do not have access to a tool that may direct them towards their pricing criteria. The same is true for house hunters, who are at the mercy of real estate players when it comes to deciding the prices of their properties. It is generally accepted that the prices of existing properties should be equivalent to the discounted present value of the anticipated stream of future income (rents), which is contingent upon a number of factors including the anticipated growth in income, the anticipated real interest rates, taxes, geographical features, neighborhood features, land surface features, and other structural factors [2].  There are two major categories that can be used to classify the collection of elements that affect rent: economic considerations and non economic ones. Income level and interest rate are two examples of economic parameters that can be considered. Both the total floor area and the number of rooms are structure-related characteristics that have a positive impact on the rental value [3]. This means that the rental value increases in proportion to the amount of space and the number of rooms. In this project, the rental prices data is analyzed. The goal of the analysis is to find out what are the factors affecting the rental price of a house. The dataset provided consists of a wide range of attributes related to houses which could potentially affect the house rental price. Based on the previous studies, the factors that are taken into account in this project includes area of house, bedrooms, type of building, agreement type and number of bathrooms.
+
+
+
+## Summary Data:
+
+A number of data pre-processing steps are applied to prepare the data for analysis. The first steps that is applied is to subset the data for columns of interest only. These includes building type, square feet area, bedrooms, bathrooms and type of rental agreement. The values in the bedrooms are replaced with descriptive categories. There were a few instances where the number of bedrooms were 1.5 which is not a possibility and hence they are replaced as NA and removed. Similarly, for agreement type there were some values which were "Not Available" and hence they are replaced with NA and removed. Finally, the categorical columns are converted to factors.
+
+```{r}
+data <- read.csv("toronto.apartments-2.csv")
+data <- data %>%
+  select(Price, Building.Type, Sq.feet, Bedrooms, Bathrooms, Agreement.Type)
+
+data$Bedrooms[data$Bedrooms == "3"] <- "Three Bedrooms"
+data$Bedrooms[data$Bedrooms == "2"] <- "Two Bedrooms"
+data$Bedrooms[data$Bedrooms == "1"] <- "One Bedrooms"
+data$Bedrooms[data$Bedrooms == "1 + Den"] <- "One Bedroom With Den"
+data$Bedrooms[data$Bedrooms == "2 + Den"] <- "Two Bedrooms With Den"
+data$Bathrooms[data$Bathrooms == 1.5] <- NA
+data$Agreement.Type[data$Agreement.Type == "Not Available"] <- NA
+
+data <- na.omit(data)
+data$Bedrooms <- as.factor(data$Bedrooms)
+data$Building.Type <- as.factor(data$Building.Type)
+data$Agreement.Type <- as.factor(data$Agreement.Type)
+```
+
+In order to check the distribution of rental prices a histogram is created and is attached below. It can be seen that the rental prices is highly skewed with a very few observations that are above 10,000. This shows that there are extreme outliers in the rental prices.
+
+```{r}
+# Draw a histogram
+hist(data$Price, main = "Distribution of Rental Prices",
+     xlab = "Rental Price", ylab = "Frequency", col = "lightblue")
+```
+
+These outliers are removed from the rental prices column using the IQR method with a cut off value of 0.25 and 0.75. Any value that is below the first quartile or above the third quartile is termed as outlier and is removed.
+
+```{r}
+Q1 <- quantile(data$Price, .25)
+Q3 <- quantile(data$Price, .75)
+IQR <- IQR(data$Price)
+data <- subset(data, data$Price > (Q1 - 1.5*IQR) & 
+                      data$Price < (Q3 + 1.5*IQR))
+```
+
+
+Moving forward, the distribution of bedrooms is plotted and it can be seen that the highest number of rental properties are those which have one bedroom, followed by two bedrooms, bachelors studio, one bedroom with den, two bedrooms with den and finally the lowest count of rental properties are those which have three bedrooms.
+
+```{r}
+res <- data %>%
+  group_by(Bedrooms) %>%
+  summarise(Count = n())
+
+ggplot(res, aes(x = Bedrooms, y = Count, fill = Bedrooms)) +
+  geom_bar(position = "dodge", stat = "identity") +
+  labs(x = "Bedrooms", y = "Count") +
+  ggtitle("Distribution of Bedrooms") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+Similarly, the distribution of building type is plotted and it can be seen that the highest number of rental properties are apartments, followed by basement, condo, house and the least are those which are town houses. 
+
+```{r}
+res <- data %>%
+  group_by(Building.Type) %>%
+  summarise(Count = n())
+
+ggplot(res, aes(x = Building.Type, y = Count, fill = Building.Type)) +
+  geom_bar(position = "dodge", stat = "identity") +
+  labs(x = "Building Type", y = "Count") +
+  ggtitle("Distribution of Building Type") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+Moving forward, the count of properties by rooms and type of building is plotted. It can be seen that among the bachelor studios, most common are either apartments or basements. In case of one bedroom with den, most common are condo, followed by apartments and basement. In case of one bedrooms with den, most common are apartments, followed by basement, condo and house. In case of three bedrooms, all are apartments. In case of two bedrooms, most common are apartments, followed by basements and then condo. Finally, in case of two bedrooms with den, most common are apartments, followed by basement, condo, house and town house. 
+
+```{r}
+ggplot(data, aes(x = factor(Bedrooms), fill = Building.Type)) +
+  geom_bar(position = "dodge", stat = "count") +
+  labs(x = "Bedrooms", y = "Count", fill = "Building Type") +
+  ggtitle("Distribution of Rental by Building Type and Bedrooms") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+A two way scatter plot is created to show the relationship between area and rental price. It can be seen that there is a strong positive relationship between both variables. This means that increase in area of a house increases the rental price and decrease in the area of a house decreases the rental price.
+
+```{r}
+ggplot(data, aes(x = Price, y = Sq.feet)) +
+  geom_point() +
+  labs(x = "Rental Price", y = "Area (SQFT)") +
+  ggtitle("Relationship Between Rental Price & Area (SQFT)")
+```
+
+
+## Rent Price Model:
+
+### Regression Model:
+
+A regression model is fitted and the summary of the model thus obtained is attached below. The overall fit of the model is reasonable, as the adjusted R-squared is 0.5076, indicating that about 50.76% of the variability in rental prices is explained by the independent variables. The p-value of the model is also below alpha = 0.05, indicating that the overall model is statistically significant.
+
+
+```{r}
+model <- lm(Price ~.,
+            data = data)
+summary(model)
+```
+
+### Interpreting Coefficients:
+
+The coefficients of the model shows that:
+
+- Basement: Holding all other variables constant, the rental price is expected to decrease by $515.0098 for basement units compared to apartments.
+
+- Condo: There's no significant difference in rental price compared to apartments, as the coefficient is not statistically significant.
+
+- House: Rental price is expected to decrease by $399.6880 for houses compared to apartments.
+
+- Townhouse: There's no significant difference in rental price compared to apartments, as the coefficient is not statistically significant.
+
+- One Bedroom With Den: It is not statistically significant.
+
+One Bedroom: It is not statistically significant.
+
+- Three Bedrooms: Rental price is expected to increase by $790.9682 compared to bachelor studio units.
+
+- Two Bedrooms: Rental price is expected to increase by $543.4799 compared to bachelor studio units.
+
+- Two Bedrooms With Den: Rental price is expected to increase by $1133.8222 compared to bachelor studio units.
+
+- Rental price is expected to decrease by $185.7928 for month-to-month agreements compared to yearly agreements.
+
+- There's no significant effect of the number of bathrooms on rental price, as the coefficient is not statistically significant.
+
+- For each additional square foot, the rental price is expected to increase by $0.6019, holding all other variables constant.
+
+
+### Regression Diagnostics:
+
+The diagnostic plots are created and are attached below. It can be seen that the assumption of linearity is violated, while the assumption of normality is also violated. There are no extreme values in this case except 2-3 points which are above 3 standard deviation.
+
+```{r, warning=FALSE, message=FALSE}
+par(mfrow=c(2,2))
+plot(model, col = "steel blue")
+```
+
+
+### Sample Rentals:
+
+Three random rows are extracted from the dataset which are below. These three test samples are used to predict the price of rental using the regression model trained.
+
+```{r}
+test_data <- data[c(23, 200, 115),]
+test_data
+```
+
+
+The actual and the predicted prices are attached below. It can be seen that the actual price of first sample is 1800 while the predicted price is 1849.4 approximately. Similarly for second sample the actual price is 2400 while the predicted price is way below it. The actual and predicted price is close to each other for third sample.
+
+```{r}
+pred <- predict(model, test_data)
+test_data$Predicted_Price <- pred
+test_data[,c(1,7)]
+```
+
+As the diagnostic plot showed us that the assumption of normality and linearity are violated hence that maybe the reason. The regression model assumes a linear relationship between the independent variables and rental prices. If this assumption does not hold true in reality, the model predictions may deviate from actual prices, especially for properties with unique characteristics or located in areas with distinct market dynamics.
+
+## Conclusion:
+
+Concluding, while the regression model provides valuable insights into the factors influencing rental prices, it is evident that the actual rental prices do not perfectly align with the model's predictions in all cases. Several factors could contribute to this difference in predicted and actual values. The limitations of this study are that the model doesn't satisfy the assumptions of regression.
+
+
+## References:
+
+1. Singla, H.K. and Bendigiri, P. (2019), "Factors affecting rentals of residential apartments in Pune, India: an empirical investigation", International Journal of Housing Markets and Analysis, Vol. 12 No. 6, pp. 1028-1054. https://doi.org/10.1108/IJHMA-12-2018-0097
+
+2. I. D. Amenyah and E. A. Fletcher. (2013), “FACTORS DETERMINING RESIDENTIAL RENTAL PRICES,” Asian Economic and Financial Review, p. 12.
+
+3. P. Bracke,(2015), “House Prices and Rents: Microevidence from a Matched Data Set in Central London: House Prices and Rents,” Real Estate Economics, vol. 43, no. 2, pp. 403-431.
+
+
+
+
+
+
